@@ -3,23 +3,25 @@ FROM phusion/baseimage:0.9.16
 ENV baseDir .
 
 RUN apt-get update && \
-	curl -sL https://deb.nodesource.com/setup | sudo bash - \
+	curl -sL https://deb.nodesource.com/setup | sudo bash - && \
 	apt-get install -y build-essential \
 		wget nodejs unzip time imagemagick optipng strace nginx git \
 		python zlib1g-dev libpcre3-dev aspell aspell-en aspell-de \
 		aspell-de-alt aspell-fr && \
 	apt-get clean
 
-RUN wget -O /opt/qpdf-6.0.0.tar.gz https://s3.amazonaws.com/sharelatex-random-files/qpdf-6.0.0.tar.gz && tar xzf qpdf-6.0.0.tar.gz && rm /opt/qpdf-6.0.0.tar.gz
-WORKDIR /opt/qpdf-6.0.0
-RUN ./configure && make -j4 && make install && ldconfig
+RUN wget -O /opt/qpdf-6.0.0.tar.gz https://s3.amazonaws.com/sharelatex-random-files/qpdf-6.0.0.tar.gz && \
+	tar xzf /opt/qpdf-6.0.0.tar.gz -C /opt && \
+	rm /opt/qpdf-6.0.0.tar.gz && \
+	cd /opt/qpdf-6.0.0 && \
+	./configure && make -j4 && make install && ldconfig
+
+ADD ${baseDir}/installation.profile /install-tl-unx/installation.profile
 
 # Install TexLive
 RUN wget http://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz; \
-	mkdir /install-tl-unx; \
 	tar -xvf install-tl-unx.tar.gz -C /install-tl-unx --strip-components=1 && \
-	echo "selected_scheme scheme-full" >> /install-tl-unx/texlive.profile; \
-	/install-tl-unx/install-tl -profile /install-tl-unx/texlive.profile && \
+	/install-tl-unx/install-tl -profile /install-tl-unx/installation.profile; \
 	rm -r /install-tl-unx; \
 	rm install-tl-unx.tar.gz
 
@@ -45,37 +47,21 @@ ADD ${baseDir}/services.js /var/www/sharelatex/config/services.js
 ADD ${baseDir}/package.json /var/www/package.json
 ADD ${baseDir}/git-revision.js /var/www/git-revision.js
 WORKDIR /var/www
-RUN npm install
-WORKDIR /var/www/sharelatex
-
 RUN npm install; \
-	grunt install;
+	cd /var/www/sharelatex && \
+	npm install; \
+	grunt install
 
 WORKDIR /var/www
-RUN node git-revision > revisions.txt
-WORKDIR /var/www/sharelatex/web
-# Minify js assets
-RUN grunt compile:minify;
-WORKDIR /var/www/sharelatex/clsi
-RUN grunt compile:bin && \
-	mkdir /etc/service/nginx
+RUN node git-revision > revisions.txt && \
+	cd /var/www/sharelatex/web && \
+	grunt compile:minify; \
+	cd /var/www/sharelatex/clsi && \
+	grunt compile:bin; \
+	rm /etc/nginx/sites-enabled/default
 
-ADD ${baseDir}/runit/nginx.sh /etc/service/nginx/run
 
 # Set up ShareLaTeX services to run automatically on boot
-RUN mkdir /etc/service/chat-sharelatex; \
-	mkdir /etc/service/clsi-sharelatex; \
-	mkdir /etc/service/docstore-sharelatex; \
-	mkdir /etc/service/document-updater-sharelatex; \
-	mkdir /etc/service/filestore-sharelatex; \
-	mkdir /etc/service/real-time-sharelatex; \
-	mkdir /etc/service/spelling-sharelatex; \
-	mkdir /etc/service/tags-sharelatex; \
-	mkdir /etc/service/track-changes-sharelatex; \
-	mkdir /etc/service/web-sharelatex; \
-	mkdir /etc/sharelatex
-
-
 ADD ${baseDir}/runit/chat-sharelatex.sh             /etc/service/chat-sharelatex/run
 ADD ${baseDir}/runit/clsi-sharelatex.sh             /etc/service/clsi-sharelatex/run
 ADD ${baseDir}/runit/docstore-sharelatex.sh         /etc/service/docstore-sharelatex/run
@@ -86,8 +72,8 @@ ADD ${baseDir}/runit/spelling-sharelatex.sh         /etc/service/spelling-sharel
 ADD ${baseDir}/runit/tags-sharelatex.sh             /etc/service/tags-sharelatex/run
 ADD ${baseDir}/runit/track-changes-sharelatex.sh    /etc/service/track-changes-sharelatex/run
 ADD ${baseDir}/runit/web-sharelatex.sh              /etc/service/web-sharelatex/run
+ADD ${baseDir}/runit/nginx.sh 						/etc/service/nginx/run
 
-RUN rm /etc/nginx/sites-enabled/default
 ADD ${baseDir}/nginx/nginx.conf /etc/nginx/nginx.conf
 ADD ${baseDir}/nginx/sharelatex.conf /etc/nginx/sites-enabled/sharelatex.conf
 

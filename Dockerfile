@@ -19,9 +19,10 @@ RUN wget -O /opt/qpdf-6.0.0.tar.gz https://s3.amazonaws.com/sharelatex-random-fi
 ADD ${baseDir}/installation.profile /install-tl-unx/installation.profile
 
 # Install TexLive
+WORKDIR /opt
 RUN wget http://mirror.ctan.org/systems/texlive/tlnet/install-tl-unx.tar.gz; \
 	tar -xvf install-tl-unx.tar.gz -C /install-tl-unx --strip-components=1 && \
-	/install-tl-unx/install-tl -profile /install-tl-unx/installation.profile; \
+	/install-tl-unx/install-tl -profile /install-tl-unx/installation.profile && \
 	rm -r /install-tl-unx; \
 	rm install-tl-unx.tar.gz
 

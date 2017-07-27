@@ -1,7 +1,8 @@
-FROM sharelatex/sharelatex
+FROM sharelatex/sharelatex:v0.6.3
 
-RUN tlmgr option docfiles 0 && \
-    tlmgr install scheme-full && \
+RUN     tlmgr update --self && \
+	tlmgr option docfiles 0 && \
+	tlmgr install scheme-full && \
 	rm /usr/local/texlive/2016/texmf-var/web2c/tlmgr.log
 
 EXPOSE 80
